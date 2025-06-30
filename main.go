@@ -21,6 +21,7 @@ func main() {
 	http.HandleFunc("/vulnerable-order", handlers.VulnerableOrderHandler)
 	http.HandleFunc("/vulnerable-order/add-to-cart", handlers.VulnerableAddToCartHandler)
 	http.HandleFunc("/vulnerable-order/checkout", handlers.VulnerableCheckoutHandler)
+	http.HandleFunc("/vulnerable-order/pay", handlers.VulnerablePayHandler)
 	http.HandleFunc("/vulnerable-order/confirm", handlers.VulnerableConfirmHandler)
 	http.HandleFunc("/vulnerable-order/result", handlers.VulnerableOrderResultHandler)
 
@@ -28,7 +29,7 @@ func main() {
 	http.HandleFunc("/secure-order", handlers.SecureOrderHandler)
 	http.HandleFunc("/secure-order/add-to-cart", handlers.SecureAddToCartHandler)
 	http.HandleFunc("/secure-order/checkout", handlers.SecureCheckoutHandler)
-	http.HandleFunc("/secure-order/confirm", handlers.SecureConfirmHandler)
+	http.HandleFunc("/secure-order/pay", handlers.SecurePayHandler)
 	http.HandleFunc("/secure-order/result", handlers.SecureOrderResultHandler)
 
 	// Vulnerable Price Manipulation Shop

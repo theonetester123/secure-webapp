@@ -136,7 +136,42 @@ func VulnerableCheckoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	models.SetOrder(order)
 
-	// Simulate payment page
+	// Redirect to payment page
+	http.Redirect(w, r, fmt.Sprintf("/vulnerable-order/pay?order_id=%s", orderID), http.StatusSeeOther)
+}
+
+// Payment page - shows form and handles POST
+func VulnerablePayHandler(w http.ResponseWriter, r *http.Request) {
+	var orderID string
+
+	if r.Method == "POST" {
+		// For POST requests, get order_id from form data
+		orderID = r.FormValue("order_id")
+	} else {
+		// For GET requests, get order_id from URL query
+		orderID = r.URL.Query().Get("order_id")
+	}
+	if orderID == "" {
+		http.Redirect(w, r, "/vulnerable-order", http.StatusSeeOther)
+		return
+	}
+
+	if r.Method == "POST" {
+
+		// VULNERABILITY: No validation of payment details or order ownership
+		// Just redirect to confirm page
+		http.Redirect(w, r, fmt.Sprintf("/vulnerable-order/confirm?order_id=%s", orderID), http.StatusSeeOther)
+		return
+	}
+
+	// VULNERABILITY: No validation of order ownership when showing payment form
+	order, exists := models.GetOrder(orderID)
+	if !exists {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
+	}
+
+	// Show payment form (GET request)
 	tmpl := `
 <!DOCTYPE html>
 <html>
@@ -150,11 +185,17 @@ func VulnerableCheckoutHandler(w http.ResponseWriter, r *http.Request) {
         <p>Order ID: {{.OrderID}}</p>
         <p>Total: ${{printf "%.2f" .Total}}</p>
         
-        <form method="POST" action="/vulnerable-order/confirm">
+        <form method="POST" action="/vulnerable-order/pay">
             <input type="hidden" name="order_id" value="{{.OrderID}}">
             <h3>Payment Details</h3>
-            <input type="text" placeholder="Card Number" required>
-            <input type="text" placeholder="CVV" required>
+            <div>
+                <label>Card Number:</label>
+                <input type="text" name="card_number" placeholder="1234-5678-9012-3456" required>
+            </div>
+            <div>
+                <label>CVV:</label>
+                <input type="text" name="cvv" placeholder="123" required>
+            </div>
             <button type="submit">Pay Now</button>
         </form>
     </div>
@@ -166,38 +207,104 @@ func VulnerableCheckoutHandler(w http.ResponseWriter, r *http.Request) {
 		Total   float64
 	}{
 		OrderID: orderID,
-		Total:   cart.Total,
+		Total:   order.Total,
 	}
 
-	t, _ := template.New("payment").Parse(tmpl)
-	t.Execute(w, data)
+	t, err := template.New("vulnerable-payment").Parse(tmpl)
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+		return
+	}
+
+	err = t.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Template execution error", http.StatusInternalServerError)
+		return
+	}
 }
 
 func VulnerableConfirmHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	var orderID string
+
+	if r.Method == "POST" {
+		orderID = r.FormValue("order_id")
+
+		order, exists := models.GetOrder(orderID)
+		if !exists {
+			http.Error(w, "Order not found", http.StatusNotFound)
+			return
+		}
+
+		order.Status = "completed"
+		models.SetOrder(order)
+
+		sessionID := getOrCreateSession(w, r)
+		models.ClearCart(sessionID)
+
+		http.Redirect(w, r, fmt.Sprintf("/vulnerable-order/result?order_id=%s", orderID), http.StatusSeeOther)
+		return
+	}
+
+	// GET request - show confirmation page
+	orderID = r.URL.Query().Get("order_id")
+	if orderID == "" {
 		http.Redirect(w, r, "/vulnerable-order", http.StatusSeeOther)
 		return
 	}
 
-	orderID := r.FormValue("order_id")
-
-	// VULNERABILITY: No validation of order ownership or payment verification
 	order, exists := models.GetOrder(orderID)
 	if !exists {
 		http.Error(w, "Order not found", http.StatusNotFound)
 		return
 	}
 
-	// Update order status
-	order.Status = "completed"
-	models.SetOrder(order)
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Confirm Payment</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        let countdown = 3;
+        function updateCountdown() {
+            document.getElementById('countdown').textContent = countdown;
+            if (countdown <= 0) {
+                document.getElementById('confirmForm').submit();
+            } else {
+                countdown--;
+                setTimeout(updateCountdown, 1000);
+            }
+        }
+        window.onload = function() {
+            updateCountdown();
+        };
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Confirm Your Payment</h1>
+        <p>Order ID: {{.OrderID}}</p>
+        <p>Total: ${{printf "%.2f" .Total}}</p>
+        <p>Payment processed. Order will be confirmed in <span id="countdown">3</span> seconds...</p>
+        
+        <form id="confirmForm" method="POST" action="/vulnerable-order/confirm">
+            <input type="hidden" name="order_id" value="{{.OrderID}}">
+            <button type="submit">Confirm Now</button>
+        </form>
+    </div>
+</body>
+</html>`
 
-	// Clear cart
-	sessionID := getOrCreateSession(w, r)
-	models.ClearCart(sessionID)
+	data := struct {
+		OrderID string
+		Total   float64
+	}{
+		OrderID: orderID,
+		Total:   order.Total,
+	}
 
-	// Redirect to result
-	http.Redirect(w, r, fmt.Sprintf("/vulnerable-order/result?order_id=%s", orderID), http.StatusSeeOther)
+	t, _ := template.New("vulnerable-confirm").Parse(tmpl)
+	t.Execute(w, data)
 }
 
 func VulnerableOrderResultHandler(w http.ResponseWriter, r *http.Request) {
@@ -244,6 +351,6 @@ func VulnerableOrderResultHandler(w http.ResponseWriter, r *http.Request) {
 		Order: order,
 	}
 
-	t, _ := template.New("result").Parse(tmpl)
+	t, _ := template.New("vulnerable-result").Parse(tmpl)
 	t.Execute(w, data)
 }
