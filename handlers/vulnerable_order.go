@@ -23,7 +23,7 @@ func VulnerableOrderHandler(w http.ResponseWriter, r *http.Request) {
 <body>
     <div class="container">
         <h1>Vulnerable Order Processing Shop</h1>
-        <p class="warning">Warning: This shop has order processing vulnerabilities!</p>
+        <p class="warning">Warning: Orders can be completed without paying!</p>
         
         <div class="products">
             <h2>Products</h2>

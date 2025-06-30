@@ -23,6 +23,7 @@ func SecureOrderHandler(w http.ResponseWriter, r *http.Request) {
 <body>
     <div class="container">
         <h1>Secure Order Processing Shop</h1>
+		<p class="success">Orders are confirmed only after payment is completed and the payment gateway sends a confirmation webhook!</p>
 
         <div class="products">
             <h2>Products</h2>

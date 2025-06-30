@@ -35,7 +35,6 @@ func SecurePriceHandler(w http.ResponseWriter, r *http.Request) {
                     <input type="number" name="quantity" value="1" min="1" max="10">
                     <button type="submit">Add to Cart</button>
                 </form>
-                <p><small>No price data sent to server - completely secure!</small></p>
             </div>
             {{end}}
         </div>
